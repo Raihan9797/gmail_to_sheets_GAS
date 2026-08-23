@@ -1,6 +1,7 @@
 const UNKNOWN_ACCOUNT = "UnknownAccount"
 const UNKNOWN_AMOUNT = "UnknownAmount"
 const UNKNOWN_MERCHANT = "UnknownMerchant"
+const NO_MERCHANT_PROVIDED = "NoMerchantProvided"
 const INCOME = "Income"
 const EXPENSE = "Expense"
 
@@ -145,7 +146,6 @@ function citibankParsingStrategy(messageBody) {
   const merchantMatch = messageBody.match(/Transaction\s+details\s*:\s*(.*)\b/i);
   const accountMatch = messageBody.match(/Account\s+number\s*:\s*(.*)\b/i);
   const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
-  Logger.log(accountMatch)
   return {
     account: accountMatch ? cleanCitiAccountValue(accountMatch[1]) : UNKNOWN_ACCOUNT,
     amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
@@ -154,8 +154,12 @@ function citibankParsingStrategy(messageBody) {
   }
 }
 
+/** Cleans up Citibank account names as it has many Xs and (-). helps to shorten the data.
+ * 
+ * @param {*} account 
+ * @returns account with Xs and dashes (-) removed
+ */
 function cleanCitiAccountValue(account) {
-  Logger.log(account.replace(/[X-]/g, ""))
   return account.replace(/[X-]/g, "")
 }
 
@@ -177,6 +181,23 @@ function citibankPaynowParsingStrategy(messageBody) {
   };
 }
 
+/** Citibank Card and Payment Transaction
+ * We would like to inform you that the following Standing Instruction has been successful.
+ * Account No.	:	XXXXXX1234
+ * Amount	:	SGD 5678.00
+ * Transaction Date	:	01/01/26
+ */
+function citibankStandingInstructionParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/Amount\s*:\s*(.*)\b/i);
+  const accountMatch = messageBody.match(/Account No.\s:\s(.*)\b/i);
+  const isSuccess = !!(amountMatch && accountMatch);  
+  return {
+    account: accountMatch ? cleanCitiAccountValue(accountMatch[1]) : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: NO_MERCHANT_PROVIDED,
+    isSuccess: isSuccess,
+  }
+}
 
 
 
@@ -255,6 +276,44 @@ function uobReversalParsingStrategy(messageBody) {
   const amountMatch = messageBody.match(/transaction of\s+([A-Z0-9,. ]*)\s+made/);
   const merchantMatch = messageBody.match(/at\s+(.*)\s+has been/);
   const accountMatch = messageBody.match(/\bCard ending\s+(\d{4})/i);
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
+  
+  return {
+    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
+    isSuccess: isSuccess,
+    income_expense: INCOME
+  };
+}
+
+
+/** Yay! Overseas transaction successful 😁
+ * 0% FX fees! You've spent MYR 23.45 using Trust Link card at GRAB RIDES-EC SOME LOCATION on 1 Jan 2026 11:11SGT. Not you? Alert us via Trust App.
+ */
+function trustOverseasTransactionParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/spent\s+([A-Z0-9,. ]*)\s+using/);
+  const merchantMatch = messageBody.match(/at\s+(.*)\s+on /);
+  const accountMatch = messageBody.match(/\bUsing\s(.*)\sat /i);
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
+  
+  return {
+    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
+    isSuccess: isSuccess,
+    income_expense: EXPENSE
+  };
+}
+
+
+/** Overseas transaction cancelled 💳
+ * We've cancelled your purchase of MYR 23.45 at YOUR MERCHANT on 1 Jan 2026 11:11SGT with Trust Link card.
+ */
+function trustOverseasTransactionCancelledParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/cancelled your purchase of\s+([A-Z0-9,. ]*)\s+at/);
+  const merchantMatch = messageBody.match(/at\s+(.*)\s+on /);
+  const accountMatch = messageBody.match(/ with\s(.*)/);
   const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
   
   return {
