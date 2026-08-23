@@ -1,12 +1,12 @@
 const TARGET_TAB_NAME = "autoTransactions"
-//const SEARCH_QUERY = "label:0_AUTOMATIONS/TransactionQueue -label:0_AUTOMATIONS/Archive/Transactions"
+const SEARCH_QUERY = "label:0_AUTOMATIONS/TransactionQueue -label:0_AUTOMATIONS/Archive/Transactions"
 
 /* use this if you need to rerun: basically only run those that have been successful
 before you run, make sure to save a copy of the sheet to see if the final rows are the same as before.
-*/
 
 const SEARCH_QUERY = "label:0_AUTOMATIONS/Archive/Transactions"
 
+*/
 
 
 const PROCESSED_LABEL_NAME = "0_AUTOMATIONS/Archive/Transactions";
