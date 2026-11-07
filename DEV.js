@@ -2,9 +2,10 @@ const TEST_TARGET_TAB_NAME = "txn_test_sheet"
 const TEST_SEARCH_QUERY = "label:0_AUTOMATIONS/txn_test"
 
 function main3() {
-  const threads = searchByLabel(TEST_SEARCH_QUERY, 30);
+  const threads = searchByLabel(TEST_SEARCH_QUERY);
   let transactions = [];
   let errorTransactions = [];
+
 
   const processedLabel = generateProcessedLabelIfMissing(PROCESSED_LABEL_NAME);
 
@@ -16,13 +17,15 @@ function main3() {
       const message = messages[j];
 
       const parsingStrategy = getParsingStrategy(message);
+
       if (parsingStrategy) {
         const parsedData = executeParsingStrategy(message, parsingStrategy);
 
         if (!parsedData.isSuccess) {
-          transactions.push(parsedData);
           errorTransactions.push(parsedData);
+          transactions.push(parsedData);
           allMessagesInThreadProcessed = false; // if fail, do not mark as processed but still add to sheet
+
         } else {
           transactions.push(parsedData)
 
@@ -36,19 +39,10 @@ function main3() {
     }
     */
   }
-  writeBulkDataToSheet(transactions, TEST_TARGET_TAB_NAME, SHEET_SCHEMA)
+  writeBulkDataToSheet(
+    transactions, 
+    TEST_TARGET_TAB_NAME, 
+    SHEET_SCHEMA
+  )
   writeBulkDataToSheet(errorTransactions, ERROR_SHEET_NAME, ERROR_SHEET_SCHEMA)
-  
 }
-
-
-
-
-
-
-
-
-
-
-
-

@@ -33,7 +33,7 @@ function prodMain4() {
 
         if (!parsedData.isSuccess) {
           errorTransactions.push(parsedData);
-          transactions.push(parsedData)
+          transactions.push(parsedData);
           allMessagesInThreadProcessed = false; // if fail, do not mark as processed but still add to sheet
 
         } else {
@@ -47,6 +47,10 @@ function prodMain4() {
       thread.addLabel(processedLabel);
     }
   }
-  writeBulkDataToSheet(transactions, TARGET_TAB_NAME, SHEET_SCHEMA)
+  writeBulkDataToSheet(
+    transactions, 
+    TARGET_TAB_NAME, 
+    SHEET_SCHEMA
+  )
   writeBulkDataToSheet(errorTransactions, ERROR_SHEET_NAME, ERROR_SHEET_SCHEMA)  
 }
