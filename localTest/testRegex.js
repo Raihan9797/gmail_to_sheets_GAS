@@ -8,8 +8,8 @@ function loadGasFile(relativePath) {
   const code = fs.readFileSync(fullPath, 'utf8').replace(/\bexport\s+/g, ''); // remove unecessary export keyword
   vm.runInThisContext(code);
 }
-loadGasFile('amountProcessor.js');
-loadGasFile('strategies.js');
+loadGasFile('src/amountProcessor.js');
+loadGasFile('src/strategies.js');
 
 // --- TEST RUNNER HELPER ---
 function runTest(testName, strategyFn, sampleBody) {
