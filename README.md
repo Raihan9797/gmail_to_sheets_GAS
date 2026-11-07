@@ -4,8 +4,13 @@
 - the code filters by the label and then parses them to the correct transaction 
 
 
-### doing offline local testing of new parsing strategies
-- A quick method to test your parsing without having to use google apps script is to open a html file with a script to run your test examples. Make sure when you import the script, set it as `type=module`.
-- Add your new method into `strategies.js` with the `export` keyword (You will need to remove this when you try to do `clasp push` to update your code in google apps script)
-- you can then import your strategy into `testRegex.js`, with a sample to run and console.log the result
-- you can then load the html file with VSCode Live Server plugin and open the console to see the result
+### Offline local testing of new parsing strategies
+- The test runner loads `strategies.js` and `amountProcessor.js` directly into Node's global execution context: code stays 100% vanilla Google Apps Script and is always ready for `clasp push`.
+- Run in terminal
+  ```bash
+  node localTest/testRegex.js
+  ```
+- Or enable auto-run on save with watch mode:
+  ```bash
+  node --watch localTest/testRegex.js
+  ```

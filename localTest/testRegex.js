@@ -1,34 +1,56 @@
-/** YOU WILL NEED TO EXPORT THE METHODS IN STRATEGIES.JS
- * and then you can import them here
- * 
- * When doing `clasp push` to update your code in google apps script, you will have to remove the `export` keyword again
- * 
- */
-import { trustOverseasTransactionParsingStrategy, trustOverseasTransactionCancelledParsingStrategy, citibankStandingInstructionParsingStrategy } from '../strategies.js'
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 
-// ####### TRUST OVERSEAS TRANSACTION #########
-const trust_overseas_txn_str = `
-0% FX fees! You've spent MYR 23.45 using Trust Link card at GRAB RIDES-EC SOME LOCATION on 1 Jan 2026 11:11SGT. Not you? Alert us via Trust App.
-`;
+// --- Helper: Load GAS files into Node global context ---
+function loadGasFile(relativePath) {
+  const fullPath = path.resolve(__dirname, '..', relativePath);
+  const code = fs.readFileSync(fullPath, 'utf8').replace(/\bexport\s+/g, ''); // remove unecessary export keyword
+  vm.runInThisContext(code);
+}
+loadGasFile('amountProcessor.js');
+loadGasFile('strategies.js');
 
-// const result = uobParsingStrategy(trust_overseas_txn_str);
-const result = trustOverseasTransactionParsingStrategy(trust_overseas_txn_str);
-console.log(result)
+// --- TEST RUNNER HELPER ---
+function runTest(testName, strategyFn, sampleBody) {
+  console.log(`\n========================================`);
+  console.log(`TEST: ${testName}`);
+  console.log(`========================================`);
 
-// ####### TRUST OVERSEAS TRANSACTION CANCELLATION #########
-const trust_cancelled_overseas_txn_str = `
-We've cancelled your purchase of MYR 23.45 at YOUR MERCHANT on 1 Jan 2026 11:11SGT with Trust Link card.
-`
-const result2 = trustOverseasTransactionCancelledParsingStrategy(trust_cancelled_overseas_txn_str);
-console.log(result2)
+  const rawResult = strategyFn(sampleBody);
+  
+  // Format for clean table view
+  console.table({
+    "Success?": rawResult.isSuccess ? '✅ YES' : '❌ NO',
+    "Account": rawResult.account,
+    "Raw Amount": rawResult.amount,
+    "Clean Amount": cleanAmountString(rawResult.amount),
+    "Currency": extractCurrency(rawResult.amount),
+    "Merchant": rawResult.merchant,
+    "Type": rawResult.income_expense || 'Expense'
+  });
+}
 
+// ========================================
+// TEST CASES
+// ========================================
+runTest(
+  'Trust Overseas Transaction',
+  trustOverseasTransactionParsingStrategy,
+  `0% FX fees! You've spent MYR 23.45 using Trust Link card at GRAB RIDES-EC SOME LOCATION on 1 Jan 2026 11:11SGT. Not you? Alert us via Trust App.`
+);
 
-// ####### CITIBANK STANDING INSTRUCTIONS #########
-const citibank_standing_instr = `
-We would like to inform you that the following Standing Instruction has been successful.
+runTest(
+  'Trust Overseas Transaction Cancelled',
+  trustOverseasTransactionCancelledParsingStrategy,
+  `We've cancelled your purchase of MYR 23.45 at YOUR MERCHANT on 1 Jan 2026 11:11SGT with Trust Link card.`
+);
+
+runTest(
+  'Citibank Standing Instruction',
+  citibankStandingInstructionParsingStrategy,
+  `We would like to inform you that the following Standing Instruction has been successful.
 Account No.	:	XXXXXX1234
 Amount	:	SGD 5678.00
-Transaction Date	:	01/01/26
-`;
-const citibank_standing_instr_result = citibankStandingInstructionParsingStrategy(citibank_standing_instr);
-console.log(citibank_standing_instr_result)
+Transaction Date	:	01/01/26`
+);
