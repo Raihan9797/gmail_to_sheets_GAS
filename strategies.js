@@ -15,33 +15,47 @@ const EXPENSE = "Expense"
 function getParsingStrategy(message) {
   const sender = message.getFrom().toLowerCase();
   const subject = message.getSubject();
+  const messageBody = message.getPlainBody();
   // Logger.log(sender);
   // Logger.log(message.getSubject())
   // Logger.log("Message Body:\n" + message.getPlainBody());
 
-  if (sender.includes("unialerts@uobgroup.com") && subject.includes("Your transaction has been reversed")) 
-    return uobReversalParsingStrategy;
-
-  else if (sender.includes("unialerts@uobgroup.com")) 
-    return uobParsingStrategy;
-
-  else if (sender.includes("paylah.alert@dbs.com"))
-    return dbsPaylahParsingStrategy;
-
-  else if (sender.includes("alerts@citibank.com.sg") && subject.includes("Successful PayNow Transaction"))
+  // ### CITIBANK ###
+  if (sender.includes("alerts@citibank.com.sg") && subject.includes("Successful PayNow Transaction"))
     return citibankPaynowParsingStrategy;
-
+  else if (sender.includes("alerts@citibank.com.sg") && subject.includes("Standing Instruction Debited"))
+    return citibankStandingInstructionParsingStrategy;
   else if (sender.includes("alerts@citibank.com.sg"))
     return citibankParsingStrategy;
 
+  // ### DBS / POSB ###
+  else if (sender.includes("paylah.alert@dbs.com") && messageBody.includes("verseas transaction"))
+    return dbsPaylahOverseasParsingStrategy;
+  else if (sender.includes("paylah.alert@dbs.com") && messageBody.includes("Amount"))
+    return dbsPaylahParsingStrategy;
+  else if (sender.includes("ibanking.alert@dbs.com"))
+    return dbsParsingStrategy;
+
+  // ### OCBC ###
   else if (sender.includes("noreply@notify.ocbc.com")) {
     return ocbcParsingStrategy;
   }
-  else if (sender.includes("ibanking.alert@dbs.com"))
-    return dbsParsingStrategy;
   
+  // ### TRUST ###
   else if (sender.includes("from_us@trustbank.sg") && subject.includes("Overseas cash withdrawal successful"))
     return trustOverseasWithdrawalParsingStrategy;
+  else if (sender.includes("from_us@trustbank.sg") && subject.includes("Overseas transaction successful"))
+    return trustOverseasTransactionParsingStrategy;
+  else if (sender.includes("from_us@trustbank.sg") && subject.includes("Transaction successful"))
+    return trustLocalTransactionParsingStrategy;
+  else if (sender.includes("from_us@trustbank.sg") && subject.includes("ransaction cancelled"))
+    return trustOverseasTransactionCancelledParsingStrategy;
+
+  // ### UOB ###
+  if (sender.includes("unialerts@uobgroup.com") && subject.includes("Your transaction has been reversed")) 
+    return uobReversalParsingStrategy;
+  else if (sender.includes("unialerts@uobgroup.com")) 
+    return uobParsingStrategy;
 
   else {
     Logger.log("######## Unknown sender ##########");
@@ -92,38 +106,6 @@ function executeParsingStrategy(message, strategyFn) {
  * 
  * 
  */
-
-/** TRUST OVERSEAS WITHDRAWAL
- * 
- */
-function trustOverseasWithdrawalParsingStrategy(messageBody) {
-  const amountMatch = messageBody.match(/withdrew\s+(.*)\s+with/);
-  const isSuccess = (amountMatch)
-  return {
-    account: "Trust Bank Account",
-    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
-    merchant: "Overseas ATM Withdrawal",
-    isSuccess: isSuccess,
-  };
-}
-
-
-
-/** OCBC Card Transaction
- * 
- */
-function ocbcParsingStrategy(messageBody) {
-  const amountMatch = messageBody.match(/([A-Z]{3}[\d,.]+)/);
-  const accountMatch = messageBody.match(/\(-(\d+)\)/);
-  const merchantMatch = messageBody.match(/\bcard\b.*?\bat\b\s+([^.]+)/);
-  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
-  return {
-    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
-    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
-    merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
-    isSuccess: isSuccess,
-  };
-}
 
 /** Citibank Card and Payment Transaction
  * 
@@ -250,23 +232,139 @@ function dbsPaylahParsingStrategy(messageBody) {
 }
 
 
-
-/** UOB Card Transaction
+/** DBS Paylah OVERSEAS Transaction
+ * Similar to paylah, but we have to use SGD Equivalent value as amount 
+ * 
+  We refer to your PayLah! Overseas transaction dated 10 Jan SGT. We are 
+  pleased to confirm that the transaction was completed. 
+  Point-of-Sale Date & Time: 10 Jan 11:11 
+  SG Date & Time: 10 Jan 11:11 (SGT) 
+  Amount Paid: IDR30000.00 
+  SGD Equivalent: SGD2.19 
+  From: PayLah! Wallet (Mobile ending 1111) 
+  To: My Merchant Roaster - HO 
  * 
  */
-function uobParsingStrategy(messageBody) {
-  const amountMatch = messageBody.match(/transaction of\s(\w+\s?[0-9,.]*)\s+was made/);
-  const merchantMatch = messageBody.match(/at\s+(.*)[.]\s*If unauthorised/);
-  const accountMatch = messageBody.match(/\bCard ending\s+(\d{4})/);
+function dbsPaylahOverseasParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/SGD Equivalent\s*:\s*(.*)/);
+  const accountMatch = messageBody.match(/From\s*:\s*(.*)/);  
+  const merchantMatch = messageBody.match(/To\s*:\s*(.*)/);  
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
+
+  return {
+    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? merchantMatch[1]: UNKNOWN_MERCHANT,
+    isSuccess: isSuccess
+  };
+}
+
+
+
+/** OCBC Card Transaction
+ * 
+ */
+function ocbcParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/([A-Z]{3}[\d,.]+)/);
+  const accountMatch = messageBody.match(/\(-(\d+)\)/);
+  const merchantMatch = messageBody.match(/\bcard\b.*?\bat\b\s+([^.]+)/);
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
+  return {
+    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
+    isSuccess: isSuccess,
+  };
+}
+
+
+/** Trust Local Transaction with card
+ * You've spent SGD 11.11 at Grab* B-123456 Singapore SG on 1 Jan  2026 11:11SGT with Trust Link card.
+ * NOTE: this assumes a card was used to match the account. 
+ */
+function trustLocalTransactionParsingStrategy(messageBody) {
+  messageBody = replaceNewLineWithSpaces(messageBody)
+
+  const amountMatch = messageBody.match(/spent\s+([A-Z0-9,. ]*)\s+at/);
+  const merchantMatch = messageBody.match(/at\s+(.*)\s+on /);
+  const accountMatch = messageBody.match(/with\s(.*) card/i);
   const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
   
   return {
     account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
     amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
     merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
-    isSuccess: isSuccess
+    isSuccess: isSuccess,
+    income_expense: EXPENSE
   };
 }
+
+
+/** TRUST OVERSEAS WITHDRAWAL
+ * 
+ */
+function trustOverseasWithdrawalParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/withdrew\s+(.*)\s+with/);
+  const isSuccess = (amountMatch)
+  return {
+    account: "Trust Bank Account",
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: "Overseas ATM Withdrawal",
+    isSuccess: isSuccess,
+  };
+}
+
+
+/** Yay! Overseas transaction successful 😁
+ * 0% FX fees! You've spent MYR 23.45 using Trust Link card at GRAB RIDES-EC SOME LOCATION on 1 Jan 2026 11:11SGT. Not you? Alert us via Trust App.
+ */
+function trustOverseasTransactionParsingStrategy(messageBody) {
+  messageBody = replaceNewLineWithSpaces(messageBody)
+
+  const amountMatch = messageBody.match(/spent\s+([A-Z0-9,. ]*)\s+using/);
+  const merchantMatch = messageBody.match(/at\s+(.*)\s+on /);
+  const accountMatch = messageBody.match(/\bUsing\s(.*)\sat /i);
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
+  
+  return {
+    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
+    isSuccess: isSuccess,
+    income_expense: EXPENSE
+  };
+}
+
+/** Replaces new lines in a text with whitespace. 
+ * This prevents text splitting breaking regex for trust transactions
+ * 
+ * @param {*} text text with one or more new lines
+ */
+function replaceNewLineWithSpaces(text) {
+   return text.replace(/\n/g, " ");
+}
+
+
+/** Trust Overseas transaction cancelled 💳
+ * We've cancelled your purchase of MYR 23.45 at YOUR MERCHANT on 1 Jan 2026 11:11SGT with Trust Link card.
+ */
+function trustOverseasTransactionCancelledParsingStrategy(messageBody) {
+  messageBody = replaceNewLineWithSpaces(messageBody)
+  const amountMatch = messageBody.match(/cancelled your purchase of\s+([A-Z0-9,. ]*)\s+at/);
+  const merchantMatch = messageBody.match(/at\s+(.*)\s+on /);
+  const accountMatch = messageBody.match(/ with ([^.]*)[.]/);
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
+  
+  return {
+    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
+    isSuccess: isSuccess,
+    income_expense: INCOME
+  };
+}
+
+
 
 
 /** UOB Reversal 
@@ -286,41 +384,19 @@ function uobReversalParsingStrategy(messageBody) {
     income_expense: INCOME
   };
 }
-
-
-/** Yay! Overseas transaction successful 😁
- * 0% FX fees! You've spent MYR 23.45 using Trust Link card at GRAB RIDES-EC SOME LOCATION on 1 Jan 2026 11:11SGT. Not you? Alert us via Trust App.
+/** UOB Card Transaction
+ * 
  */
-function trustOverseasTransactionParsingStrategy(messageBody) {
-  const amountMatch = messageBody.match(/spent\s+([A-Z0-9,. ]*)\s+using/);
-  const merchantMatch = messageBody.match(/at\s+(.*)\s+on /);
-  const accountMatch = messageBody.match(/\bUsing\s(.*)\sat /i);
+function uobParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/transaction of\s(\w+\s?[0-9,.]*)\s+was made/);
+  const merchantMatch = messageBody.match(/at\s+(.*)[.]\s*If unauthorised/);
+  const accountMatch = messageBody.match(/\bCard ending\s+(\d{4})/);
   const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
   
   return {
     account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
     amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
     merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
-    isSuccess: isSuccess,
-    income_expense: EXPENSE
-  };
-}
-
-
-/** Overseas transaction cancelled 💳
- * We've cancelled your purchase of MYR 23.45 at YOUR MERCHANT on 1 Jan 2026 11:11SGT with Trust Link card.
- */
-function trustOverseasTransactionCancelledParsingStrategy(messageBody) {
-  const amountMatch = messageBody.match(/cancelled your purchase of\s+([A-Z0-9,. ]*)\s+at/);
-  const merchantMatch = messageBody.match(/at\s+(.*)\s+on /);
-  const accountMatch = messageBody.match(/ with\s(.*)/);
-  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
-  
-  return {
-    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
-    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
-    merchant: merchantMatch ? merchantMatch[1] : UNKNOWN_MERCHANT,
-    isSuccess: isSuccess,
-    income_expense: INCOME
+    isSuccess: isSuccess
   };
 }
