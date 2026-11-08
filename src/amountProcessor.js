@@ -19,6 +19,9 @@ function cleanAmountString(rawAmount) {
  */
 function extractCurrency(rawAmount) {
   if (!rawAmount) return UNKNOWN_CURRENCY;
+
+  // Handle S$ edge case for dbs NETS
+  if (/S\$/i.test(rawAmount)) return "SGD";
   const currencyMatch = rawAmount.match(/([a-zA-Z]{3})/); // include lowercase
   return currencyMatch ? currencyMatch[1] : UNKNOWN_CURRENCY;
 }

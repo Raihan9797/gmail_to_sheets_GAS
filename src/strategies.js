@@ -5,8 +5,6 @@ const NO_MERCHANT_PROVIDED = "NoMerchantProvided"
 const INCOME = "Income"
 const EXPENSE = "Expense"
 
-
-
 /**
  * ################ GET THE STRATEGY ##################
  * 
@@ -28,13 +26,19 @@ function getParsingStrategy(message) {
   else if (sender.includes("alerts@citibank.com.sg"))
     return citibankParsingStrategy;
 
-  // ### DBS / POSB ###
-  else if (sender.includes("paylah.alert@dbs.com") && messageBody.includes("verseas transaction"))
-    return dbsPaylahOverseasParsingStrategy;
-  else if (sender.includes("paylah.alert@dbs.com") && messageBody.includes("Amount"))
-    return dbsPaylahParsingStrategy;
+  // ### DBS ###
+  else if (sender.includes("ibanking.alert@dbs.com") && subject.includes("received a transfer"))
+    return dbsReceivedTransferParsingStrategy;
   else if (sender.includes("ibanking.alert@dbs.com"))
     return dbsParsingStrategy;
+
+  // ### PAYLAH ###
+  else if (sender.includes("paylah.alert@dbs.com") && messageBody.includes("verseas transaction"))
+    return paylahOverseasParsingStrategy;
+  else if (sender.includes("paylah.alert@dbs.com") && messageBody.includes("refund transaction") && messageBody.includes("Amount"))
+    return paylahRefundParsingStrategy;
+  else if (sender.includes("paylah.alert@dbs.com") && messageBody.includes("Amount"))
+    return paylahParsingStrategy;
 
   // ### OCBC ###
   else if (sender.includes("noreply@notify.ocbc.com")) {
@@ -200,6 +204,37 @@ function dbsParsingStrategy(messageBody) {
   };
 }
 
+
+/** DBS Received Transfer
+ * You have received SGD 123.45 via PayNow on 01 Jan 2026 11:11 SGT.
+ * From: MARSHALL MATHERS
+ * To: Your DBS/ POSB account ending 1234
+ */
+function dbsReceivedTransferParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/received\s*(.*)\svia/);
+  const accountMatch = messageBody.match(/From\s*:\s*(.*)/);  
+  const merchantMatch = messageBody.match(/To\s*:\s*(.*)/);
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
+
+  return {
+    account: accountMatch ? cleanDBSString(accountMatch[1]) : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? cleanDBSString(amountMatch[1]): UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? cleanDBSString(merchantMatch[1]) : UNKNOWN_MERCHANT,
+    isSuccess: isSuccess,
+    income_expense: INCOME
+  };
+}
+
+/** Replaces S with SGD as nets has some edge case eg below
+Amount: S$2.50
+ */
+function cleanDbsNETSCurrencyString(stringValue) {
+  if (stringValue.trim().startsWith("*"))
+    return stringValue.trim().slice(1);
+  else
+    return stringValue;
+
+}
 /** Removes the * at the start of dbs values
  * This happens because the keys are bolded eg. *Amount: *sgd123.45
  * Resulting in getting the * at the start
@@ -214,10 +249,10 @@ function cleanDBSString(stringValue) {
 
 
 
-/** DBS Paylah Transaction
+/** Paylah Transaction
  * Currently same format as dbs parser
  */
-function dbsPaylahParsingStrategy(messageBody) {
+function paylahParsingStrategy(messageBody) {
   const amountMatch = messageBody.match(/Amount\s*:\s*(.*)/);
   const accountMatch = messageBody.match(/From\s*:\s*(.*)/);  
   const merchantMatch = messageBody.match(/To\s*:\s*(.*)/);  
@@ -231,8 +266,30 @@ function dbsPaylahParsingStrategy(messageBody) {
   };
 }
 
+/** Paylah Refund Transaction
+ * We refer to your PayLah! refund transaction below and are pleased to confirm that the transaction was completed.
+ * Date & Time: 01 Jan20:42 (SGT)
+ * Amount: SGD 0.30
+ * From: BCRS LTD
+ * To: PayLah! Wallet (Mobile ending 1234)
+ */
+function paylahRefundParsingStrategy(messageBody) {
+  const amountMatch = messageBody.match(/Amount\s*:\s*(.*)/);
+  const accountMatch = messageBody.match(/From\s*:\s*(.*)/);  
+  const merchantMatch = messageBody.match(/To\s*:\s*(.*)/);  
+  const isSuccess = !!(amountMatch && accountMatch && merchantMatch);  
 
-/** DBS Paylah OVERSEAS Transaction
+  return {
+    account: accountMatch ? accountMatch[1] : UNKNOWN_ACCOUNT,
+    amount: amountMatch ? amountMatch[1] : UNKNOWN_AMOUNT,
+    merchant: merchantMatch ? merchantMatch[1]: UNKNOWN_MERCHANT,
+    isSuccess: isSuccess,
+    income_expense: INCOME
+  };
+}
+
+
+/** Paylah Overseas Transaction
  * Similar to paylah, but we have to use SGD Equivalent value as amount 
  * 
   We refer to your PayLah! Overseas transaction dated 10 Jan SGT. We are 
@@ -245,7 +302,7 @@ function dbsPaylahParsingStrategy(messageBody) {
   To: My Merchant Roaster - HO 
  * 
  */
-function dbsPaylahOverseasParsingStrategy(messageBody) {
+function paylahOverseasParsingStrategy(messageBody) {
   const amountMatch = messageBody.match(/SGD Equivalent\s*:\s*(.*)/);
   const accountMatch = messageBody.match(/From\s*:\s*(.*)/);  
   const merchantMatch = messageBody.match(/To\s*:\s*(.*)/);  

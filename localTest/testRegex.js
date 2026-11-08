@@ -54,3 +54,29 @@ Account No.	:	XXXXXX1234
 Amount	:	SGD 5678.00
 Transaction Date	:	01/01/26`
 );
+
+
+runTest(
+    'xxx',
+    dbsParsingStrategy,
+    `We refer to your card transaction request dated 01/01/25. We are pleased to 
+confirm that the transaction was completed. 
+
+Date & Time: 20 JAN 17:11 (SGT) 
+Amount: SGD1500.00 
+From: DBS/POSB card ending 1234 
+To: MY*MERCHANT AT merchant.com SGP 
+`
+);
+
+
+runTest(
+    'dbs nets scan and pay using dbs parser',
+    dbsParsingStrategy,
+    `Your NETS Scan & Pay transaction on 05 Jul 15:58 SGT was successful.
+
+Date & Time: 05 Jul 15:58 SGT
+Amount: S$2.50
+From: DBS/POSB Account ending 6161
+To: SOY ONE`
+)
